@@ -7,6 +7,7 @@
   const MAX_OUTPUT_CHARS = 20000;
   const MAX_CODE_CHARS_FOR_MODEL = 16000;
   const MAX_DIFF_LINES = 40;
+  const MAX_TESTS_CHARS_FOR_MODEL = 6000;
   const MAX_OUTPUT_CHARS_FOR_MODEL = 2000;
   const MAX_HISTORY_CHARS = 8000;
 
@@ -25,6 +26,11 @@
         localStorage.setItem('ip.' + key, JSON.stringify(value));
       } catch {}
     },
+    remove(key) {
+      try {
+        localStorage.removeItem('ip.' + key);
+      } catch {}
+    },
   };
 
   // ---------------------------------------------------------------- problems
@@ -40,42 +46,80 @@
     $('promptText').textContent = problem.prompt;
     $('promptText').hidden = !!problem.custom;
     $('customPrompt').hidden = !problem.custom;
-    $('runBar').hidden = $('output').hidden = !!problem.design;
-    $('runTests').hidden = $('testsPanel').hidden = !problem.tests;
-    $('testsPanel').open = false;
-    $('testsCode').textContent = problem.tests;
-    $('testsCount').textContent = (problem.tests.match(/^def test_/gm) || []).length;
+    $('runBar').hidden = $('output').hidden = $('tabs').hidden = !!problem.design;
     editor.setLanguage(problem.design ? 'markdown' : 'python');
     editor.setValue(store.get('code.' + problem.id, problem.starter));
+    editor.setTests(store.get('tests.' + problem.id, problem.tests));
+    showTab('code');
+    updateTestsCount();
     setOutput('');
     lastRun = null;
   }
 
   // ------------------------------------------------------------------ editor
 
-  // Starts as a plain textarea and is swapped for Monaco once that has loaded.
+  // One editor with two documents, the candidate's code and the tests, switched by the tabs.
+  // It starts as a plain textarea and is swapped for Monaco once that has loaded.
   const fallback = $('editorFallback');
-  let editor = {
-    getValue: () => fallback.value,
-    setValue: (v) => { fallback.value = v; },
-    setLanguage: () => {},
-  };
+  const buffers = { code: '', tests: '' };
+  let activeTab = 'code';
   let saveTimer = null;
+
+  function setBuffer(tab, value) {
+    buffers[tab] = value;
+    if (tab === activeTab) fallback.value = value;
+  }
+
+  let editor = {
+    getValue: () => buffers.code,
+    setValue: (v) => setBuffer('code', v),
+    getTests: () => buffers.tests,
+    setTests: (v) => setBuffer('tests', v),
+    setLanguage: () => {},
+    showTab: (tab) => { fallback.value = buffers[tab]; },
+  };
+
+  function showTab(tab) {
+    activeTab = tab;
+    $('tabCode').classList.toggle('active', tab === 'code');
+    $('tabTests').classList.toggle('active', tab === 'tests');
+    $('reset').textContent = tab === 'tests' ? 'Reset tests' : 'Reset code';
+    editor.showTab(tab);
+  }
+
+  function updateTestsCount() {
+    const count = (editor.getTests().match(/^def test_/gm) || []).length;
+    $('tabTests').textContent = `Tests (${count})`;
+  }
+
+  function saveNow() {
+    clearTimeout(saveTimer);
+    store.set('code.' + problem.id, editor.getValue());
+    // Only tests the candidate changed are stored, so updates to the built-in tests still reach them.
+    const tests = editor.getTests();
+    if (tests === problem.tests) store.remove('tests.' + problem.id);
+    else store.set('tests.' + problem.id, tests);
+    updateTestsCount();
+  }
 
   function onEdit() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => store.set('code.' + problem.id, editor.getValue()), 400);
+    saveTimer = setTimeout(saveNow, 400);
   }
 
   function useFallbackEditor() {
     $('editor').hidden = true;
     fallback.hidden = false;
-    fallback.addEventListener('input', onEdit);
+    const changed = () => {
+      buffers[activeTab] = fallback.value;
+      onEdit();
+    };
+    fallback.addEventListener('input', changed);
     fallback.addEventListener('keydown', (e) => {
       if (e.key !== 'Tab') return;
       e.preventDefault();
       fallback.setRangeText('    ', fallback.selectionStart, fallback.selectionEnd, 'end');
-      onEdit();
+      changed();
     });
   }
 
@@ -93,10 +137,15 @@
       };
       window.require.config({ paths: { vs: MONACO + '/vs' } });
       window.require(['vs/editor/editor.main'], () => {
-        const current = editor.getValue();
-        const instance = window.monaco.editor.create($('editor'), {
-          value: current,
-          language: problem.design ? 'markdown' : 'python',
+        const m = window.monaco;
+        const models = {
+          code: m.editor.createModel(buffers.code, problem.design ? 'markdown' : 'python'),
+          tests: m.editor.createModel(buffers.tests, 'python'),
+        };
+        const viewStates = {}; // cursor and scroll position of the tab that is not showing
+        let shown = activeTab;
+        const instance = m.editor.create($('editor'), {
+          model: models[shown],
           theme: 'vs-dark',
           fontSize: 14,
           minimap: { enabled: false },
@@ -104,11 +153,25 @@
           scrollBeyondLastLine: false,
           tabSize: 4,
         });
-        instance.onDidChangeModelContent(onEdit);
+        models.code.onDidChangeContent(onEdit);
+        models.tests.onDidChangeContent(onEdit);
+        const replace = (tab, value) => {
+          models[tab].setValue(value);
+          delete viewStates[tab];
+        };
         editor = {
-          getValue: () => instance.getValue(),
-          setValue: (v) => instance.setValue(v),
-          setLanguage: (lang) => window.monaco.editor.setModelLanguage(instance.getModel(), lang),
+          getValue: () => models.code.getValue(),
+          setValue: (v) => replace('code', v),
+          getTests: () => models.tests.getValue(),
+          setTests: (v) => replace('tests', v),
+          setLanguage: (lang) => m.editor.setModelLanguage(models.code, lang),
+          showTab: (tab) => {
+            if (tab === shown) return;
+            viewStates[shown] = instance.saveViewState();
+            shown = tab;
+            instance.setModel(models[tab]);
+            if (viewStates[tab]) instance.restoreViewState(viewStates[tab]);
+          },
         };
       }, useFallbackEditor);
     };
@@ -192,9 +255,13 @@
   // With tests, the problem's test functions run after the candidate's code, in the same namespace.
   function run(withTests) {
     if (!workerReady || running || problem.design) return;
-    if (withTests && !problem.tests) return;
     const editorCode = editor.getValue();
-    const code = withTests ? [editorCode, problem.tests, window.TEST_RUNNER].join('\n\n') : editorCode;
+    const tests = editor.getTests();
+    if (withTests && !tests.trim()) {
+      setOutput('There are no tests yet. Write functions named test_... in the Tests tab, then run them here.');
+      return;
+    }
+    const code = withTests ? [editorCode, tests, window.TEST_RUNNER].join('\n\n') : editorCode;
     runId += 1;
     running = true;
     lastRun = { code: editorCode, output: '', status: 'running' };
@@ -256,7 +323,7 @@
       '- Exception: this is a practice session, so if the candidate directly asks for the answer, the solution, or an explanation, give it plainly and completely. Do not respond with a question or a hint, and do not ask them to try first. That reply may run up to six sentences, and it must end with a statement, not a question.',
       '- If the candidate asks to see the code, explain the approach in a sentence or two and then write the code in a fenced code block. Code blocks are shown on screen and are not read aloud. This is the only situation in which you write code.',
       '- You can see the candidate\'s editor and the output of their last code run. They are attached to the end of the candidate\'s latest message inside square-bracket sections. Use them to judge progress and point out real bugs, but never mention the sections themselves or read them back.',
-      '- The candidate can also run a fixed set of tests against their code. When they do, the run output lists each test as PASS, FAIL or ERROR with a reason, followed by a total. Treat failing tests as evidence of real bugs, and do not call the solution working while tests fail.',
+      '- The candidate can also run a fixed set of tests against their code. When they do, the run output lists each test as PASS, FAIL or ERROR with a reason, followed by a total. Treat failing tests as evidence of real bugs, and do not call the solution working while tests fail. If the candidate writes or changes tests, those tests are attached in their own section.',
       '- The editor section is refreshed with every message and is the only source of truth for the code. Read it again each time. If it disagrees with something said earlier, including your own earlier remarks, the editor is right.',
       '- If the code has a bug, ask a question that leads the candidate to it before telling them, unless they asked you to just tell them.',
       '- Once the solution works, move on to follow-up questions from your notes, one at a time.',
@@ -303,6 +370,11 @@
       }
     }
     if (problem.design) return text;
+
+    const tests = editor.getTests();
+    if (tests.trim() && tests !== problem.tests) {
+      text += '\n\n[TESTS TAB: tests the candidate wrote or edited]\n' + tests.slice(0, MAX_TESTS_CHARS_FOR_MODEL);
+    }
 
     if (!lastRun) {
       text += '\n\n[LAST RUN OUTPUT]\n(the code has not been run yet)';
@@ -786,7 +858,7 @@
     }
 
     $('problem').addEventListener('change', () => {
-      store.set('code.' + problem.id, editor.getValue());
+      saveNow();
       problem = problems.find((p) => p.id === $('problem').value);
       store.set('problem', problem.id);
       stopResponding();
@@ -812,8 +884,14 @@
     $('runTests').addEventListener('click', () => run(true));
     $('stop').addEventListener('click', () => killRun('Stopped by you'));
     $('reset').addEventListener('click', () => {
-      if (window.confirm('Replace your code with the starter code for this problem?')) editor.setValue(problem.starter);
+      if (activeTab === 'tests') {
+        if (window.confirm('Replace the tests with the built-in tests for this problem?')) editor.setTests(problem.tests);
+      } else if (window.confirm('Replace your code with the starter code for this problem?')) {
+        editor.setValue(problem.starter);
+      }
     });
+    $('tabCode').addEventListener('click', () => showTab('code'));
+    $('tabTests').addEventListener('click', () => showTab('tests'));
     $('mic').addEventListener('click', toggleMic);
     $('send').addEventListener('click', sendFromInput);
     $('input').addEventListener('keydown', (e) => {
@@ -841,12 +919,12 @@
 
     // capture phase, so these win over the editor's own bindings
     window.addEventListener('keydown', (e) => {
-      if (!e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (!e.ctrlKey || e.altKey) return;
       if (e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
-        run(false);
-      } else if (e.key.toLowerCase() === 'm') {
+        run(e.shiftKey);
+      } else if (e.key.toLowerCase() === 'm' && !e.shiftKey) {
         e.preventDefault();
         e.stopPropagation();
         toggleMic();

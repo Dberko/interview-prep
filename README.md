@@ -25,7 +25,7 @@ If the header shows "LM Studio not connected" with a 401 message, either turn of
 - Hold **V** to talk and release to send. V only works as push-to-talk while you are not typing in the editor or the message box; click **Push to talk** in the header to pick another key (a function key such as F9 works everywhere).
 - Or press **Talk** (or Ctrl+M), speak, then press it again to send. Talking cuts the interviewer off mid-sentence.
 - **Run** (Ctrl+Enter) executes your code in the browser. Runs are stopped after 10 seconds.
-- **Run tests** runs your code and then the problem's assert tests, printing PASS, FAIL or ERROR for each. Open **Tests** under the problem to read them. They expect the names used in the starter code.
+- **Run tests** (Ctrl+Shift+Enter) runs your code and then the tests, printing PASS, FAIL or ERROR for each. The tests live in the **Tests** tab next to **Code**, where you can read, edit and add to them. The built-in ones expect the names used in the starter code. If you change the tests, the interviewer sees them too.
 - **End & get feedback** asks the interviewer for an assessment.
 - Your code is saved per problem in the browser.
 
