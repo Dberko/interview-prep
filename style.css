@@ -12,6 +12,8 @@
 
 * { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 html, body { height: 100%; margin: 0; }
 
 body {
@@ -78,6 +80,19 @@ button.recording { background: var(--danger); border-color: var(--danger); color
   white-space: pre-wrap;
   max-height: 130px;
   overflow: auto;
+}
+
+.tests { padding: 0 12px 8px; color: var(--muted); font-size: 12px; }
+.tests summary { cursor: pointer; }
+.tests pre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: 6px;
+  background: #101216;
+  color: var(--text);
+  font: 12px/1.5 Consolas, "Cascadia Code", monospace;
 }
 
 .custom { margin: 0 12px 8px; padding: 8px; min-height: 70px; resize: vertical; }

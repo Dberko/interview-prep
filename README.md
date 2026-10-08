@@ -25,6 +25,7 @@ If the header shows "LM Studio not connected" with a 401 message, either turn of
 - Hold **V** to talk and release to send. V only works as push-to-talk while you are not typing in the editor or the message box; click **Push to talk** in the header to pick another key (a function key such as F9 works everywhere).
 - Or press **Talk** (or Ctrl+M), speak, then press it again to send. Talking cuts the interviewer off mid-sentence.
 - **Run** (Ctrl+Enter) executes your code in the browser. Runs are stopped after 10 seconds.
+- **Run tests** runs your code and then the problem's assert tests, printing PASS, FAIL or ERROR for each. Open **Tests** under the problem to read them. They expect the names used in the starter code.
 - **End & get feedback** asks the interviewer for an assessment.
 - Your code is saved per problem in the browser.
 
@@ -46,4 +47,5 @@ Every message to the model carries the system prompt, the recent conversation, y
 - `server.py`: static file server plus proxy to LM Studio
 - `app.js`: editor, runner, chat, voice
 - `problems.js`: the problem bank; add your own here
+- `tests.js`: the assert tests for each problem, and the runner that reports them
 - `py-worker.js`: runs Python off the main thread

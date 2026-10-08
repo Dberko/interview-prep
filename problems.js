@@ -83,7 +83,10 @@ window.PROBLEMS = [
       'ALLOWED_EVENTS = {"purchase", "add_to_cart", "sign_up"}\n' +
       'MAX_AGE_SECS = 7 * 24 * 3600\n\n\n' +
       'def process_batch(events: list, now: float):\n' +
-      '    """Returns (valid_events, errors). Each error is {"row": index, "reason": str}."""\n' +
+      '    """Returns (valid_events, errors).\n\n' +
+      '    A valid event keeps its fields, with "email" replaced by the SHA-256 hex digest.\n' +
+      '    Each error is {"row": index, "reason": str}.\n' +
+      '    """\n' +
       '    pass\n\n\n' +
       'batch = [\n' +
       '    {"event_id": "e1", "event_time": 1000, "event_name": "purchase", "email": " Jane@Example.com "},\n' +

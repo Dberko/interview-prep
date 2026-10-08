@@ -41,6 +41,10 @@
     $('promptText').hidden = !!problem.custom;
     $('customPrompt').hidden = !problem.custom;
     $('runBar').hidden = $('output').hidden = !!problem.design;
+    $('runTests').hidden = $('testsPanel').hidden = !problem.tests;
+    $('testsPanel').open = false;
+    $('testsCode').textContent = problem.tests;
+    $('testsCount').textContent = (problem.tests.match(/^def test_/gm) || []).length;
     editor.setLanguage(problem.design ? 'markdown' : 'python');
     editor.setValue(store.get('code.' + problem.id, problem.starter));
     setOutput('');
@@ -138,7 +142,7 @@
   }
 
   function updateRunButtons() {
-    $('run').disabled = !workerReady || running;
+    $('run').disabled = $('runTests').disabled = !workerReady || running;
     $('stop').disabled = !running;
   }
 
@@ -185,12 +189,15 @@
     startWorker();
   }
 
-  function run() {
+  // With tests, the problem's test functions run after the candidate's code, in the same namespace.
+  function run(withTests) {
     if (!workerReady || running || problem.design) return;
-    const code = editor.getValue();
+    if (withTests && !problem.tests) return;
+    const editorCode = editor.getValue();
+    const code = withTests ? [editorCode, problem.tests, window.TEST_RUNNER].join('\n\n') : editorCode;
     runId += 1;
     running = true;
-    lastRun = { code, output: '', status: 'running' };
+    lastRun = { code: editorCode, output: '', status: 'running' };
     setOutput('');
     updateRunButtons();
     runTimer = setTimeout(
@@ -249,6 +256,7 @@
       '- Exception: this is a practice session, so if the candidate directly asks for the answer, the solution, or an explanation, give it plainly and completely. Do not respond with a question or a hint, and do not ask them to try first. That reply may run up to six sentences, and it must end with a statement, not a question.',
       '- If the candidate asks to see the code, explain the approach in a sentence or two and then write the code in a fenced code block. Code blocks are shown on screen and are not read aloud. This is the only situation in which you write code.',
       '- You can see the candidate\'s editor and the output of their last code run. They are attached to the end of the candidate\'s latest message inside square-bracket sections. Use them to judge progress and point out real bugs, but never mention the sections themselves or read them back.',
+      '- The candidate can also run a fixed set of tests against their code. When they do, the run output lists each test as PASS, FAIL or ERROR with a reason, followed by a total. Treat failing tests as evidence of real bugs, and do not call the solution working while tests fail.',
       '- The editor section is refreshed with every message and is the only source of truth for the code. Read it again each time. If it disagrees with something said earlier, including your own earlier remarks, the editor is right.',
       '- If the code has a bug, ask a question that leads the candidate to it before telling them, unless they asked you to just tell them.',
       '- Once the solution works, move on to follow-up questions from your notes, one at a time.',
@@ -800,7 +808,8 @@
 
     $('start').addEventListener('click', startInterview);
     $('feedback').addEventListener('click', askFeedback);
-    $('run').addEventListener('click', run);
+    $('run').addEventListener('click', () => run(false));
+    $('runTests').addEventListener('click', () => run(true));
     $('stop').addEventListener('click', () => killRun('Stopped by you'));
     $('reset').addEventListener('click', () => {
       if (window.confirm('Replace your code with the starter code for this problem?')) editor.setValue(problem.starter);
@@ -836,7 +845,7 @@
       if (e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
-        run();
+        run(false);
       } else if (e.key.toLowerCase() === 'm') {
         e.preventDefault();
         e.stopPropagation();
