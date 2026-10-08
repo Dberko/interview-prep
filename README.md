@@ -2,6 +2,8 @@
 
 A voice mock-interview app: a Python editor you can run, and a local model (through LM Studio) that acts as the interviewer and sees your code and its output.
 
+![The app during an interview: problem and code editor on the left, conversation with the interviewer on the right](docs/screenshot.png)
+
 ## Run it
 
 1. In LM Studio, load a model and start the local server (Developer tab).
