@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interview Practice</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Interview Practice</h1>
+    <span id="timer" class="timer">00:00</span>
+    <span id="lmStatus" class="status">Connecting to LM Studio…</span>
+    <div class="settings">
+      <label>Model <select id="model"></select></label>
+      <label>Voice <select id="voice"></select></label>
+      <label>Speed <input id="rate" type="range" min="0.8" max="1.6" step="0.1" value="1.1"></label>
+      <label class="check"><input id="ttsOn" type="checkbox" checked> Speak replies</label>
+      <label class="check" title="Lets a reasoning model think before each reply. Better judgement, but a longer pause before it speaks."><input id="think" type="checkbox"> Think first</label>
+      <label>Push to talk <button id="pttKey" title="Click, then press the key you want to hold while talking">V</button></label>
+    </div>
+  </header>
+
+  <main>
+    <section class="left">
+      <div class="bar">
+        <select id="problem"></select>
+        <button id="start" class="primary">Start interview</button>
+        <button id="feedback">End &amp; get feedback</button>
+      </div>
+      <div id="promptText" class="prompt"></div>
+      <textarea id="customPrompt" class="custom" placeholder="Describe the problem you want to be interviewed on…" hidden></textarea>
+
+      <div id="editor" class="editor"></div>
+      <textarea id="editorFallback" class="editor fallback" spellcheck="false" hidden></textarea>
+
+      <div class="bar" id="runBar">
+        <button id="run" class="primary" disabled>Run (Ctrl+Enter)</button>
+        <button id="stop" disabled>Stop</button>
+        <button id="reset">Reset code</button>
+        <span id="pyStatus" class="status">Loading Python…</span>
+      </div>
+      <pre id="output" class="output"></pre>
+    </section>
+
+    <section class="right">
+      <div id="chat" class="chat">
+        <div class="hint">
+          Pick a problem and press <b>Start interview</b>. The interviewer sees your editor and the output of your last run every time you speak or send a message.
+        </div>
+      </div>
+      <div id="micNote" class="note" hidden></div>
+      <div class="composer">
+        <button id="mic">🎤 Talk</button>
+        <textarea id="input" rows="2" placeholder="Speak with the mic, or type here and press Enter"></textarea>
+        <button id="send" class="primary">Send</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="problems.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
